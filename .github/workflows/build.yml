@@ -1,0 +1,56 @@
+name: Build
+
+on:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+#    services:
+#      selenium:
+#        image: selenium/standalone-firefox:latest
+#        ports:
+#          - 4444:4444
+#        volumes:
+#          - /dev/shm:/dev/shm
+#        options: --net=host --name=selenium
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: up selenium
+        run: docker run -d --name selenium --network=host selenium/standalone-firefox:latest
+
+      - name: Set up node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 10
+
+      - name: Set cache dir
+        run: npm set cache .npm
+      - name: Get npm cache directory path
+        id: npm-cache-dir-path
+        run: echo "::set-output name=dir::$(npm get cache)"
+
+      - uses: actions/cache@v1
+        id: npm-cache
+        with:
+          path: ${{ steps.npm-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Run npm install
+        run: npm install
+
+      - name: Run server
+        run: npm run server &
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
+      - name: curl
+        run: docker exec selenium curl -i http://localhost:5000/test
+
+      - name: Run test
+        run: npm test
